@@ -7,11 +7,6 @@ pipeline {
   }
 
   stages {
-    stage('Checkout') {
-      steps {
-        git 'https://github.com/sharanabasava-dev/python-flask-devops-eks.git'
-      }
-    }
 
     stage('Build Docker Image') {
       steps {
