@@ -66,20 +66,3 @@ jobs:
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'sharana-flask-app'
-          slot-name: 'Production'
-          package: .
-```
-
----
-
-## After Commit — Pipeline Will Show:
-```
-✅ Install dependencies
-✅ Lint check (flake8)
-✅ test_home_status_code      PASSED
-✅ test_home_content          PASSED
-✅ test_home_devops_message   PASSED
-✅ test_invalid_route         PASSED
-✅ Coverage: 100%
-✅ Deploy to Azure
