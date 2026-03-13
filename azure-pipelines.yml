@@ -7,20 +7,16 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  dockerRegistry: 'sharanaregistry.azurecr.io'
-  imageName: 'flask-app'
-  acrServiceConnection: 'acr-service-connection'
-  aksServiceConnection: 'aks-service-connection'
+  azureSubscription: 'azure-connection'
+  appName: 'sharana-flask-app'
 
 stages:
 
-# ─── STAGE 1: BUILD & TEST ─────────────────────────
 - stage: Build
   displayName: 'Build & Test'
   jobs:
   - job: BuildTest
     steps:
-
     - task: UsePythonVersion@0
       inputs:
         versionSpec: '3.10'
@@ -29,50 +25,37 @@ stages:
         cd app
         pip install -r requirements.txt
         pip install pytest
-      displayName: 'Install Dependencies'
+        pytest tests/ || echo "No tests yet"
+      displayName: 'Install & Test'
 
-    - script: |
-        cd app
-        pytest tests/ || echo "No tests found, skipping"
-      displayName: 'Run Tests'
+    - task: ArchiveFiles@2
+      inputs:
+        rootFolderOrFile: 'app/'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/app.zip'
 
-# ─── STAGE 2: DOCKER BUILD & PUSH ──────────────────
-- stage: Containerize
-  displayName: 'Build & Push Docker Image'
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+
+- stage: Deploy
+  displayName: 'Deploy to App Service (Free)'
   dependsOn: Build
   jobs:
-  - job: DockerBuildPush
-    steps:
-    - task: Docker@2
-      displayName: 'Build and Push to ACR'
-      inputs:
-        containerRegistry: '$(acrServiceConnection)'
-        repository: '$(imageName)'
-        command: 'buildAndPush'
-        Dockerfile: 'app/Dockerfile'     # ← Points to app/ folder
-        buildContext: 'app/'             # ← Build context is app/
-        tags: |
-          $(Build.BuildId)
-          latest
-
-# ─── STAGE 3: DEPLOY TO AKS ────────────────────────
-- stage: Deploy
-  displayName: 'Deploy to AKS'
-  dependsOn: Containerize
-  jobs:
-  - deployment: DeployAKS
+  - deployment: DeployAppService
     environment: 'production'
     strategy:
       runOnce:
         deploy:
           steps:
-          - task: KubernetesManifest@0
-            displayName: 'Apply K8s Manifests'
+          - task: AzureWebApp@1
+            displayName: 'Deploy Flask to App Service'
             inputs:
-              action: 'deploy'
-              kubernetesServiceConnection: '$(aksServiceConnection)'
-              namespace: 'default'
-              manifests: |
-                k8s/deployment.yaml
-                k8s/service.yaml
-              containers: '$(dockerRegistry)/$(imageName):$(Build.BuildId)'
+              azureSubscription: '$(azureSubscription)'
+              appType: 'webAppLinux'
+              appName: '$(appName)'
+              package: '$(Pipeline.Workspace)/drop/app.zip'
+              runtimeStack: 'PYTHON|3.10'
+              startUpCommand: 'python app.py'
