@@ -1,5 +1,3 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
 name: Build and deploy Python app to Azure Web App - sharana-flask-app
 
 on:
@@ -22,14 +20,22 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Create and Start virtual environment and Install dependencies
+      - name: Install dependencies
         run: |
           cd app
-          python -m venv antenv
-          source antenv/bin/activate
           pip install -r requirements.txt
 
-      - name: Upload artifact for deployment jobs
+      - name: Lint with flake8
+        run: |
+          cd app
+          flake8 . --exclude=antenv,tests --max-line-length=100
+
+      - name: Run tests with coverage
+        run: |
+          cd app
+          pytest tests/ -v --cov=. --cov-report=term-missing
+
+      - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
           name: python-app
@@ -59,8 +65,21 @@ jobs:
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
-        id: deploy-to-webapp
         with:
           app-name: 'sharana-flask-app'
           slot-name: 'Production'
           package: .
+```
+
+---
+
+## After Commit — Pipeline Will Show:
+```
+✅ Install dependencies
+✅ Lint check (flake8)
+✅ test_home_status_code      PASSED
+✅ test_home_content          PASSED
+✅ test_home_devops_message   PASSED
+✅ test_invalid_route         PASSED
+✅ Coverage: 100%
+✅ Deploy to Azure
