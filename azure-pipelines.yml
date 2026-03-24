@@ -6,10 +6,15 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 
+variables:
+  azureSubscription: 'azure-connection'
+  appName: 'sharana-flask-app-01'
+
 stages:
 
+# ---------------- BUILD ----------------
 - stage: Build
-  displayName: 'Build & Test'
+  displayName: Build & Test
   jobs:
   - job: BuildTest
     steps:
@@ -21,8 +26,8 @@ stages:
         cd app
         pip install -r requirements.txt
         pip install pytest
-        pytest tests/ || echo "No tests yet"
-      displayName: 'Install & Test'
+        pytest tests/ || echo "No tests"
+      displayName: Install & Test
 
     - task: ArchiveFiles@2
       inputs:
@@ -35,3 +40,24 @@ stages:
       inputs:
         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
         ArtifactName: 'drop'
+
+# ---------------- DEPLOY ----------------
+- stage: Deploy
+  displayName: Deploy to Azure
+  dependsOn: Build
+  jobs:
+  - deployment: DeployApp
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureWebApp@1
+            displayName: Deploy Flask App
+            inputs:
+              azureSubscription: 'azure-connection'
+              appType: 'webAppLinux'
+              appName: 'sharana-flask-app-01'
+              package: '$(Pipeline.Workspace)/drop/app.zip'
+              runtimeStack: 'PYTHON|3.10'
+              startUpCommand: 'gunicorn app:app'
